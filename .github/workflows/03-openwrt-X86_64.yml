@@ -37,18 +37,37 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
     - name: 准备完成
       uses: actions/checkout@main
 
-    - name: 初始化系统环境
+    - name: 初始化系统环境（含磁盘清理和Swap创建）
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        # === 1. 释放磁盘空间 ===
+        echo "【1/5】清理系统缓存..."
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+        sudo apt-get clean
+        sudo docker system prune -af || true
+        sudo rm -rf /tmp/*
+        
+        # === 2. 创建交换文件（关键） ===
+        echo "【2/5】创建 4GB Swap..."
+        sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+        sudo chmod 600 /swapfile
+        sudo mkswap /swapfile
+        sudo swapon /swapfile
+        echo "Swap 状态："
+        free -h
+        
+        # === 3. 更新并安装依赖 ===
+        echo "【3/5】更新软件源..."
         sudo -E apt-get -qq update
+        
+        echo "【4/5】安装编译依赖..."
         sudo -E apt-get -qq install $(curl -fsSL git.io/depends-ubuntu-latest)
         sudo -E apt-get install -y ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential \
         bzip2 ccache cmake cpio curl device-tree-compiler fastjar flex gawk gettext gcc-multilib g++-multilib \
@@ -59,17 +78,23 @@ jobs:
         vim wget xmlto xxd zlib1g-dev libfuse-dev
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean
+        
+        # === 5. 创建工作目录 ===
+        echo "【5/5】创建工作目录..."
         sudo timedatectl set-timezone "$TZ"
         sudo mkdir -p /workdir
         sudo chown $USER:$GROUPS /workdir
-
+        
+        echo "✅ 环境初始化完成！磁盘状态："
+        df -hT /
+        
     - name: 下载源代码
       working-directory: /workdir
       run: |
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         ln -sf /workdir/openwrt $GITHUB_WORKSPACE/openwrt
-
+        
     - name: 更新时区、编译时间
       id: date
       run: |
@@ -80,14 +105,14 @@ jobs:
         echo "编译开始时间..."
         START_TIME=`date +'%Y-%m-%d %H:%M:%S'`
         echo "START_SECONDS=$(date --date="$START_TIME" +%s)" >> $GITHUB_ENV
-
+        
     - name: 加载自定义源码
       run: |
         [ -e $FEEDS_CONF ] && mv $FEEDS_CONF openwrt/feeds.conf.default
         chmod +x $DIY_P1_SH
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
-
+        
     - name: Update feeds
       run: cd openwrt && ./scripts/feeds update -a
 
@@ -104,7 +129,7 @@ jobs:
         git clone https://github.com/sbwml/packages_lang_golang -b 20.x feeds/packages/lang/golang
         git clone https://github.com/sbwml/luci-app-alist package/alist
         $GITHUB_WORKSPACE/$DIY_P2_SH
-
+        
     - name: SSH connection to Actions
       uses: P3TERX/ssh2actions@v1.0.0
       if: (github.event.inputs.ssh == 'true' && github.event.inputs.ssh  != 'false') || contains(github.event.action, 'ssh')
@@ -121,7 +146,6 @@ jobs:
         echo
         echo "================================================"
         echo
-
         ZZZ="package/lean/default-settings/files/zzz-default-settings"
         echo "DISTRIB_REVISION=$(cat $ZZZ|grep DISTRIB_REVISION= | sed 's/^.\{24\}//g' | sed 's/.\{26\}$//')" >> $GITHUB_ENV
         echo "KERNEL_PATCHVER=$(cat target/linux/x86/Makefile|grep KERNEL_PATCHVER | sed 's/^.\{17\}//g')" >> $GITHUB_ENV
@@ -131,7 +155,6 @@ jobs:
         echo "	    内核版本：$(cat target/linux/x86/Makefile|grep KERNEL_PATCHVER | sed 's/^.\{17\}//g')"
         echo
         echo "================================================"
-
         grep -i CONFIG_PACKAGE_luci-app .config | grep  -v \# > Plug-in
         grep -i CONFIG_PACKAGE_luci-theme .config | grep  -v \# >> Plug-in
         sed -i '/INCLUDE/d' Plug-in > /dev/null 2>&1
@@ -141,23 +164,20 @@ jobs:
         sed -i 's/=y/\ /g' Plug-in
         awk '$0=NR$0' Plug-in > Plug-2
         awk '{print "	" $0}' Plug-2 > Plug-in
-
         echo
         echo
         echo "	      已选插件列表"
         cat Plug-in
         rm -rf {Plug-in,Plug-2}
-
         echo
         echo "=========================================="
-
         echo
         echo
         echo "输出完整插件信息..."
         echo
         echo
         cat .config
-
+        
     - name: 下载固件包
       id: package
       run: |
@@ -166,7 +186,16 @@ jobs:
         make download -j8
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-
+        
+    - name: 检查磁盘空间（下载完成后）
+      run: |
+        echo "======================="
+        echo "下载完成后磁盘空间："
+        df -hT
+        echo "======================="
+        echo "Swap 状态："
+        free -h
+        
     - name: 开始编译固件
       id: compile
       run: |
@@ -188,7 +217,7 @@ jobs:
         du -h --max-depth=1 openwrt/ --exclude=build_dir --exclude=bin
         du -h --max-depth=1 openwrt/build_dir
         du -h --max-depth=1 openwrt/bin
-
+        
     - name: 整理固件文件
       id: organize
       if: env.UPLOAD_FIRMWARE == 'true' && !cancelled()
@@ -197,7 +226,7 @@ jobs:
         rm -rf packages
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
-
+        
     - name: 上传固件目录
       uses: actions/upload-artifact@main
       if: steps.organize.outputs.status == 'success' && !cancelled()
@@ -221,7 +250,7 @@ jobs:
                            
                               🎉 特别提醒：istoreX主题 需要在iStore应用商店内安装以后才能使用。🎉 
            
-                        
+
         **  在线编译固件---OpenWrt(lede)---For---X86_64  **
         
         ★ 源码 : https://github.com/coolsnowwolf/lede
@@ -242,7 +271,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
     
     - name: 自动发布固件到 Releases
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -258,7 +287,6 @@ jobs:
         repository: ${{ github.repository }}
         older-than-seconds: 86400                          # remove all workflow runs older than 1 Day
      
-
     - name: 删除自动发布的旧固件
       uses: dev-drprasad/delete-older-releases@v0.2.1
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
