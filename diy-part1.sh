@@ -17,10 +17,10 @@ echo 'src-git kenzo https://github.com/kenzok8/openwrt-packages' >>feeds.conf.de
 
 
 # 添加第三方软件包
-# git clone https://github.com/kiddin9/openwrt-packages package/feeds/kiddin9
-# git clone https://github.com/kenzok8/openwrt-packages.git package/openwrt-packages
-# git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
-# git clone https://github.com/sirpdboy/netspeedtest.git package/netspeedtest
+ git clone https://github.com/kiddin9/openwrt-packages package/feeds/kiddin9
+ git clone https://github.com/kenzok8/openwrt-packages.git package/openwrt-packages
+ git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall package/openwrt-passwall
+ git clone https://github.com/sirpdboy/netspeedtest.git package/netspeedtest
 
 svn export https://github.com/xiaorouji/openwrt-passwall/branches/luci/luci-app-passwall package/luci-app-passwall
 svn export https://github.com/xiaorouji/openwrt-passwall2/branches/main package/passwall2
@@ -30,9 +30,9 @@ git clone https://github.com/sirpdboy/luci-app-partexp.git package/luci-app-part
 sed -i 's/LINUX_VERSION-5.4 = .179/LINUX_VERSION-5.4 = .244/g' include/kernel-version.mk
 sed -i 's/LINUX_KERNEL_HASH-5.4.179 = 2c9bdec0922a95aff34e8d53d2e0ecf7e842033cd908d2959a43d34afb5d897d/LINUX_KERNEL_HASH-5.4.244 = 90f5280e95ed7b374ad6f3979ed08008e29a051e5f372d367c06ed75b002a21b/g' include/kernel-version.mk
 
-# git clone -b main --single-branch https://github.com/lxz1104/openwrt-fullconenat package/fullconenat
-# git clone https://github.com/sbwml/fullconenat package/fullconenat
-# git clone https://github.com/peter-tank/luci-app-fullconenat package/luci-app-fullconenat
+ git clone -b main --single-branch https://github.com/lxz1104/openwrt-fullconenat package/fullconenat
+ git clone https://github.com/sbwml/fullconenat package/fullconenat
+ git clone https://github.com/peter-tank/luci-app-fullconenat package/luci-app-fullconenat
 
 svn export https://github.com/kiddin9/openwrt-packages/branches/master/luci-app-ssr-plus  package/luci-app-ssr-plus
 svn export https://github.com/kiddin9/openwrt-packages/branches/master/lua-neturl package/lua-neturl
@@ -46,8 +46,8 @@ svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-cpufreq f
 ln -sf ../../../feeds/luci/applications/luci-app-cpufreq ./package/feeds/luci/luci-app-cpufreq
 
 # 添加 alist
-# svn export https://github.com/kiddin9/openwrt-packages/branches/master/alist package/alist
-# svn export https://github.com/kiddin9/openwrt-packages/branches/master/luci-app-alist  package/luci-app-alist
+ svn export https://github.com/kiddin9/openwrt-packages/branches/master/alist package/alist
+ svn export https://github.com/kiddin9/openwrt-packages/branches/master/luci-app-alist  package/luci-app-alist
 
 ./scripts/feeds update -a
 ./scripts/feeds install -a -f
