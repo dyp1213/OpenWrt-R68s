@@ -41,7 +41,7 @@ jobs:
 
     steps:
     - name: 准备完成
-      uses: actions/checkout@main
+      uses: actions/checkout@v4
 
     - name: 初始化系统环境（含磁盘清理和Swap创建）
       env:
@@ -54,7 +54,7 @@ jobs:
         sudo docker system prune -af || true
         sudo rm -rf /tmp/*
         
-        # === 2. 创建交换文件（关键） ===
+        # === 2. 创建交换文件（修复拼写和权限） ===
         echo "【2/5】创建 4GB Swap..."
         sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
         sudo chmod 600 /swapfile
@@ -228,7 +228,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: 上传固件目录
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v4
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
         name: OpenWrt_firmware${{ env.DEVICE_NAME }}${{ env.FILE_DATE }}
@@ -282,13 +282,13 @@ jobs:
         files: ${{ env.FIRMWARE }}/*
 
     - name: 删除运行记录 Delete old workflow runs
-      uses: MajorScruffy/delete-old-workflow-runs@main
+      uses: MajorScruffy/delete-old-workflow-runs@v3
       with:
         repository: ${{ github.repository }}
         older-than-seconds: 86400                          # remove all workflow runs older than 1 Day
      
     - name: 删除自动发布的旧固件
-      uses: dev-drprasad/delete-older-releases@v0.2.1
+      uses: dev-drprasad/delete-older-releases@v0.3.1
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
         keep_latest: 16        #保留多少个releases不删除
